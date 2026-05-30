@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SANDBOX — 3D Hand Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c6dfa;
+    --accent2: #fa6d8f;
+    --accent3: #6dfabd;
+    --text: #e8e8f0;
+    --text-muted: rgba(232,232,240,0.4);
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #three-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ── TOP BAR ── */
+  .top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: linear-gradient(to bottom, rgba(10,10,15,0.95) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .logo span { color: var(--accent); }
+
+  .top-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #444;
+    display: inline-block;
+    transition: background 0.3s;
+  }
+  .status-dot.active { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+
+  /* ── LEFT PANEL ── */
+  .left-panel {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .panel-section {
+    background: rgba(18,18,26,0.85);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    backdrop-filter: blur(20px);
+    min-width: 160px;
+  }
+
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .add-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 6px;
+  }
+  .add-btn:last-child { margin-bottom: 0; }
+  .add-btn:hover {
+    background: rgba(124,109,250,0.15);
+    border-color: rgba(124,109,250,0.4);
+    color: #fff;
+    transform: translateX(3px);
+  }
+  .add-btn .icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .icon-cube { background: rgba(124,109,250,0.2); }
+  .icon-sphere { background: rgba(250,109,143,0.2); }
+  .icon-cylinder { background: rgba(109,250,189,0.2); }
+  .icon-cone { background: rgba(250,200,109,0.2); }
+
+  .toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-btn.on {
+    border-color: rgba(109,250,189,0.4);
+    background: rgba(109,250,189,0.08);
+    color: var(--accent3);
+  }
+
+  .toggle-switch {
+    width: 28px; height: 16px;
+    border-radius: 8px;
+    background: #333;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-btn.on .toggle-switch { background: var(--accent3); }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+  }
+  .toggle-btn.on .toggle-switch::after { transform: translateX(12px); }
+
+  .clear-btn {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 9px;
+    border: 1px solid rgba(250,109,143,0.25);
+    background: transparent;
+    color: rgba(250,109,143,0.7);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .clear-btn:hover { background: rgba(250,109,143,0.1); color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── RIGHT PANEL — PROPERTIES ── */
+  .right-panel {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    background: rgba(18,18,26,0.85);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    backdrop-filter: blur(20px);
+    min-width: 200px;
+    transition: opacity 0.3s;
+  }
+
+  .right-panel.empty { opacity: 0.3; }
+
+  .prop-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  .prop-type {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .prop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .prop-key {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .prop-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  .prop-group {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .prop-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .prop-group-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(124,109,250,0.6);
+    margin-bottom: 8px;
+  }
+
+  /* ── BOTTOM HINTS ── */
+  .bottom-hints {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .hint-chip {
+    background: rgba(18,18,26,0.8);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 6px 14px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+  }
+  .hint-chip span { color: var(--accent); }
+
+  /* ── WEBCAM ── */
+  #webcam-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 60;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #webcam-container.visible { display: block; }
+
+  #webcam {
+    width: 200px; height: 150px;
+    object-fit: cover;
+    transform: scaleX(-1);
+    display: block;
+  }
+
+  #hand-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 200px; height: 150px;
+    transform: scaleX(-1);
+  }
+
+  .webcam-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 6px 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    color: var(--accent3);
+    text-transform: uppercase;
+  }
+
+  /* ── CURSOR ── */
+  #cursor {
+    position: fixed;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    pointer-events: none;
+    z-index: 200;
+    transform: translate(-50%, -50%);
+    transition: width 0.15s, height 0.15s, border-color 0.15s, background 0.15s;
+    mix-blend-mode: screen;
+  }
+  #cursor.hover {
+    width: 26px; height: 26px;
+    border-color: var(--accent3);
+    background: rgba(109,250,189,0.15);
+  }
+  #cursor.grab {
+    width: 22px; height: 22px;
+    border-color: var(--accent2);
+    background: rgba(250,109,143,0.2);
+    border-width: 3px;
+  }
+  #cursor.pinch {
+    width: 12px; height: 12px;
+    border-color: #fff;
+    background: rgba(255,255,255,0.3);
+  }
+
+  /* ── GESTURE FEEDBACK ── */
+  .gesture-badge {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(18,18,26,0.9);
+    border: 1px solid rgba(124,109,250,0.3);
+    border-radius: 30px;
+    padding: 8px 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .gesture-badge.show { opacity: 1; }
+
+  /* ── LOADING ── */
+  .loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    transition: opacity 0.6s;
+  }
+  .loading-screen.hide { opacity: 0; pointer-events: none; }
+
+  .loading-logo {
+    font-family: var(--mono);
+    font-size: 28px;
+    letter-spacing: 8px;
+    color: var(--text-muted);
+  }
+  .loading-logo span { color: var(--accent); }
+
+  .loading-bar {
+    width: 200px; height: 1px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .loading-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 1.5s ease;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  .loading-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">SAND<span>BOX</span></div>
+  <div class="loading-bar"><div class="loading-fill" id="loadingFill"></div></div>
+  <div class="loading-sub">Initializing 3D environment...</div>
+</div>
+
+<div id="cursor"></div>
+
+<div class="gesture-badge" id="gestureBadge">IDLE</div>
+
+<div class="top-bar">
+  <div class="logo">SAND<span>BOX</span> — 3D Builder</div>
+  <div class="top-status">
+    <span class="status-dot" id="trackingDot"></span>
+    <span id="trackingLabel">TRACKING OFF</span>
+    &nbsp;|&nbsp;
+    <span id="objectCount">0 OBJECTS</span>
+  </div>
+</div>
+
+<div class="left-panel">
+  <div class="panel-section">
+    <div class="panel-label">Add Object</div>
+    <button class="add-btn" onclick="addObject('cube')">
+      <span class="icon icon-cube">⬜</span> Cube
+    </button>
+    <button class="add-btn" onclick="addObject('sphere')">
+      <span class="icon icon-sphere">🔵</span> Sphere
+    </button>
+    <button class="add-btn" onclick="addObject('cylinder')">
+      <span class="icon icon-cylinder">🟢</span> Cylinder
+    </button>
+    <button class="add-btn" onclick="addObject('cone')">
+      <span class="icon icon-cone">🔺</span> Cone
+    </button>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-label">Controls</div>
+    <button class="toggle-btn" id="trackingBtn" onclick="toggleTracking()">
+      <span>HAND TRACK</span>
+      <div class="toggle-switch"></div>
+    </button>
+  </div>
+
+  <div class="panel-section">
+    <button class="clear-btn" onclick="clearScene()">✕ Clear All</button>
+  </div>
+</div>
+
+<div class="right-panel empty" id="rightPanel">
+  <div class="prop-title">Properties</div>
+  <div id="propContent">
+    <div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); line-height:1.6;">
+      Select an object<br>to view its<br>properties.
+    </div>
+  </div>
+</div>
+
+<div class="bottom-hints">
+  <div class="hint-chip"><span>CLICK</span> Select</div>
+  <div class="hint-chip"><span>DRAG</span> Move</div>
+  <div class="hint-chip"><span>RIGHT DRAG</span> Orbit</div>
+  <div class="hint-chip"><span>SCROLL</span> Zoom</div>
+  <div class="hint-chip"><span>PINCH</span> Grab (hand)</div>
+  <div class="hint-chip"><span>SPREAD</span> Scale (hand)</div>
+  <div class="hint-chip"><span>ROTATE HAND</span> Rotate</div>
+</div>
+
+<div id="webcam-container">
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="hand-canvas" width="200" height="150"></canvas>
+  <div class="webcam-label">● HAND TRACKING LIVE</div>
+</div>
+
+<canvas id="three-canvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── SCENE SETUP ──────────────────────────────────────────
+const canvas = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x0a0a0f, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 6, 12);
+camera.lookAt(0, 0, 0);
+
+// ── LIGHTS ──
+const ambientLight = new THREE.AmbientLight(0x1a1a3a, 1.5);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+dirLight.position.set(8, 12, 6);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 0.1;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -15;
+dirLight.shadow.camera.right = 15;
+dirLight.shadow.camera.top = 15;
+dirLight.shadow.camera.bottom = -15;
+dirLight.shadow.bias = -0.001;
+scene.add(dirLight);
+
+const fillLight = new THREE.PointLight(0x7c6dfa, 2, 30);
+fillLight.position.set(-8, 5, -5);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xfa6d8f, 1.5, 20);
+rimLight.position.set(6, 3, -8);
+scene.add(rimLight);
+
+// ── GRID ──
+const gridHelper = new THREE.GridHelper(40, 40, 0x1a1a2e, 0x12121e);
+gridHelper.position.y = -0.01;
+scene.add(gridHelper);
+
+// Subtle ground plane
+const groundGeo = new THREE.PlaneGeometry(80, 80);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x0d0d15,
+  roughness: 0.9,
+  metalness: 0.1,
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+ground.position.y = -0.02;
+scene.add(ground);
+
+// ── ORBIT CONTROLS (manual) ──
+let isOrbiting = false, isRightDrag = false;
+let prevMouse = { x: 0, y: 0 };
+let spherical = { theta: 0.3, phi: 0.8, radius: 14 };
+
+function updateCameraFromSpherical() {
+  camera.position.x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.position.y = spherical.radius * Math.cos(spherical.phi);
+  camera.position.z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.lookAt(0, 0.5, 0);
+}
+updateCameraFromSpherical();
+
+// ── OBJECTS ──
+let objects = [];
+let selectedObject = null;
+let hoveredObject = null;
+let objectIdCounter = 0;
+let isDragging = false;
+let dragPlane = new THREE.Plane();
+let dragOffset = new THREE.Vector3();
+let mouse = new THREE.Vector2();
+let raycaster = new THREE.Raycaster();
+let trackingEnabled = false;
+
+const COLORS = [0x7c6dfa, 0xfa6d8f, 0x6dfabd, 0xfac96d, 0x6db4fa, 0xfa6d6d, 0xd46dfa];
+
+const materialCache = {};
+function getMaterial(color, isSelected, isHovered) {
+  const key = `${color}-${isSelected}-${isHovered}`;
+  if (!materialCache[key]) {
+    materialCache[key] = new THREE.MeshStandardMaterial({
+      color,
+      roughness: isSelected ? 0.2 : 0.5,
+      metalness: isSelected ? 0.6 : 0.3,
+      emissive: isSelected ? new THREE.Color(color).multiplyScalar(0.2) : (isHovered ? new THREE.Color(color).multiplyScalar(0.1) : 0x000000),
+    });
+  }
+  return materialCache[key];
+}
+
+function addObject(type) {
+  const color = COLORS[objectIdCounter % COLORS.length];
+  let geometry;
+  const dims = {};
+
+  if (type === 'cube') {
+    geometry = new THREE.BoxGeometry(1, 1, 1);
+    dims.w = 1; dims.h = 1; dims.d = 1;
+  } else if (type === 'sphere') {
+    geometry = new THREE.SphereGeometry(0.6, 32, 32);
+    dims.r = 0.6;
+  } else if (type === 'cylinder') {
+    geometry = new THREE.CylinderGeometry(0.5, 0.5, 1.2, 32);
+    dims.r = 0.5; dims.h = 1.2;
+  } else if (type === 'cone') {
+    geometry = new THREE.ConeGeometry(0.6, 1.2, 32);
+    dims.r = 0.6; dims.h = 1.2;
+  }
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.5,
+    metalness: 0.3,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  const spread = 3;
+  mesh.position.set(
+    (Math.random() - 0.5) * spread,
+    0.7,
+    (Math.random() - 0.5) * spread
+  );
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  mesh.userData = {
+    id: ++objectIdCounter,
+    type,
+    color,
+    dims,
+    baseColor: color,
+    originalScale: new THREE.Vector3(1, 1, 1),
+  };
+
+  // Outline mesh
+  const outlineGeo = geometry.clone();
+  const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide });
+  const outline = new THREE.Mesh(outlineGeo, outlineMat);
+  outline.scale.setScalar(1.04);
+  outline.visible = false;
+  mesh.add(outline);
+  mesh.userData.outline = outline;
+
+  scene.add(mesh);
+  objects.push(mesh);
+
+  selectObject(mesh);
+  updateObjectCount();
+  showGesture(`${type.toUpperCase()} ADDED`);
+
+  // Spawn animation
+  mesh.scale.setScalar(0.01);
+  const targetScale = 1;
+  let t = 0;
+  const spawnAnim = () => {
+    t += 0.08;
+    const s = Math.min(targetScale, targetScale * (1 - Math.pow(1 - t, 3)));
+    mesh.scale.setScalar(s);
+    if (t < 1) requestAnimationFrame(spawnAnim);
+  };
+  spawnAnim();
+}
+
+function selectObject(obj) {
+  if (selectedObject) {
+    selectedObject.material.emissive.set(0x000000);
+    selectedObject.material.roughness = 0.5;
+    selectedObject.material.metalness = 0.3;
+    if (selectedObject.userData.outline) selectedObject.userData.outline.visible = false;
+  }
+  selectedObject = obj;
+  if (obj) {
+    obj.material.emissive = new THREE.Color(obj.userData.color).multiplyScalar(0.25);
+    obj.material.roughness = 0.2;
+    obj.material.metalness = 0.6;
+    if (obj.userData.outline) obj.userData.outline.visible = true;
+    updateProperties(obj);
+    document.getElementById('rightPanel').classList.remove('empty');
+  } else {
+    document.getElementById('rightPanel').classList.add('empty');
+    document.getElementById('propContent').innerHTML = `<div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); line-height:1.6;">Select an object<br>to view its<br>properties.</div>`;
+  }
+}
+
+function updateProperties(obj) {
+  if (!obj) return;
+  const p = obj.position;
+  const r = obj.rotation;
+  const s = obj.scale;
+  const d = obj.userData.dims;
+
+  let dimsHtml = '';
+  if (obj.userData.type === 'cube') {
+    dimsHtml = `
+      <div class="prop-row"><span class="prop-key">WIDTH</span><span class="prop-val">${(d.w * s.x).toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">HEIGHT</span><span class="prop-val">${(d.h * s.y).toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">DEPTH</span><span class="prop-val">${(d.d * s.z).toFixed(2)}</span></div>`;
+  } else if (obj.userData.type === 'sphere') {
+    dimsHtml = `<div class="prop-row"><span class="prop-key">RADIUS</span><span class="prop-val">${(d.r * s.x).toFixed(2)}</span></div>`;
+  } else {
+    dimsHtml = `
+      <div class="prop-row"><span class="prop-key">RADIUS</span><span class="prop-val">${(d.r * s.x).toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">HEIGHT</span><span class="prop-val">${(d.h * s.y).toFixed(2)}</span></div>`;
+  }
+
+  document.getElementById('propContent').innerHTML = `
+    <div class="prop-type">${obj.userData.type.toUpperCase()} #${obj.userData.id}</div>
+    <div class="prop-group">
+      <div class="prop-group-label">Position</div>
+      <div class="prop-row"><span class="prop-key">X</span><span class="prop-val">${p.x.toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">Y</span><span class="prop-val">${p.y.toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">Z</span><span class="prop-val">${p.z.toFixed(2)}</span></div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-group-label">Rotation (rad)</div>
+      <div class="prop-row"><span class="prop-key">X</span><span class="prop-val">${r.x.toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">Y</span><span class="prop-val">${r.y.toFixed(2)}</span></div>
+      <div class="prop-row"><span class="prop-key">Z</span><span class="prop-val">${r.z.toFixed(2)}</span></div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-group-label">Scale</div>
+      <div class="prop-row"><span class="prop-key">UNIFORM</span><span class="prop-val">${s.x.toFixed(2)}</span></div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-group-label">Dimensions</div>
+      ${dimsHtml}
+    </div>`;
+}
+
+function clearScene() {
+  objects.forEach(obj => scene.remove(obj));
+  objects = [];
+  selectedObject = null;
+  hoveredObject = null;
+  document.getElementById('rightPanel').classList.add('empty');
+  document.getElementById('propContent').innerHTML = `<div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); line-height:1.6;">Select an object<br>to view its<br>properties.</div>`;
+  updateObjectCount();
+  showGesture('SCENE CLEARED');
+}
+
+function updateObjectCount() {
+  document.getElementById('objectCount').textContent = objects.length + ' OBJECT' + (objects.length !== 1 ? 'S' : '');
+}
+
+// ── CURSOR ──
+const cursorEl = document.getElementById('cursor');
+let cursorX = window.innerWidth / 2, cursorY = window.innerHeight / 2;
+
+document.addEventListener('mousemove', e => {
+  cursorX = e.clientX;
+  cursorY = e.clientY;
+  cursorEl.style.left = cursorX + 'px';
+  cursorEl.style.top = cursorY + 'px';
+
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  if (isDragging && selectedObject) {
+    raycaster.setFromCamera(mouse, camera);
+    const target = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, target);
+    if (target) {
+      selectedObject.position.copy(target.sub(dragOffset));
+      selectedObject.position.y = Math.max(0.3, selectedObject.position.y);
+      updateProperties(selectedObject);
+    }
+    return;
+  }
+
+  if (isOrbiting) {
+    const dx = e.clientX - prevMouse.x;
+    const dy = e.clientY - prevMouse.y;
+    spherical.theta -= dx * 0.005;
+    spherical.phi = Math.max(0.1, Math.min(Math.PI / 2, spherical.phi + dy * 0.005));
+    updateCameraFromSpherical();
+    prevMouse = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
+  // Hover detection
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(objects);
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    if (hoveredObject !== hit) {
+      if (hoveredObject) {
+        hoveredObject.material.emissive.set(selectedObject === hoveredObject ? new THREE.Color(hoveredObject.userData.color).multiplyScalar(0.25) : 0x000000);
+      }
+      hoveredObject = hit;
+      if (hoveredObject !== selectedObject) {
+        hoveredObject.material.emissive = new THREE.Color(hoveredObject.userData.color).multiplyScalar(0.1);
+      }
+    }
+    cursorEl.className = 'hover';
+  } else {
+    if (hoveredObject && hoveredObject !== selectedObject) {
+      hoveredObject.material.emissive.set(0x000000);
+    }
+    hoveredObject = null;
+    cursorEl.className = '';
+  }
+});
+
+document.addEventListener('mousedown', e => {
+  if (e.button === 2) {
+    isOrbiting = true;
+    prevMouse = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(objects);
+
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    selectObject(hit);
+    isDragging = true;
+    cursorEl.className = 'grab';
+
+    // Setup drag plane
+    const normal = camera.position.clone().normalize();
+    dragPlane.setFromNormalAndCoplanarPoint(normal, hit.position);
+    const target = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, target);
+    dragOffset.copy(target).sub(hit.position);
+    showGesture('GRABBING');
+  } else {
+    selectObject(null);
+  }
+});
+
+document.addEventListener('mouseup', e => {
+  if (e.button === 2) { isOrbiting = false; return; }
+  isDragging = false;
+  cursorEl.className = hoveredObject ? 'hover' : '';
+  if (selectedObject) showGesture('RELEASED');
+});
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Scroll to zoom
+document.addEventListener('wheel', e => {
+  spherical.radius = Math.max(3, Math.min(40, spherical.radius + e.deltaY * 0.02));
+  updateCameraFromSpherical();
+});
+
+// Keyboard: rotate & scale selected object
+document.addEventListener('keydown', e => {
+  if (!selectedObject) return;
+  const speed = 0.08;
+  const scaleSpeed = 0.05;
+  switch(e.key) {
+    case 'q': selectedObject.rotation.y -= speed; break;
+    case 'e': selectedObject.rotation.y += speed; break;
+    case 'r': selectedObject.rotation.x -= speed; break;
+    case 'f': selectedObject.rotation.x += speed; break;
+    case '+': case '=':
+      selectedObject.scale.multiplyScalar(1 + scaleSpeed); break;
+    case '-':
+      selectedObject.scale.multiplyScalar(1 - scaleSpeed);
+      selectedObject.scale.clampScalar(0.1, 10); break;
+    case 'Delete': case 'Backspace':
+      scene.remove(selectedObject);
+      objects = objects.filter(o => o !== selectedObject);
+      selectedObject = null;
+      selectObject(null);
+      updateObjectCount();
+      showGesture('DELETED');
+      break;
+  }
+  if (selectedObject) updateProperties(selectedObject);
+});
+
+// ── GESTURE BADGE ──
+let gestureBadgeTimer = null;
+function showGesture(text) {
+  const el = document.getElementById('gestureBadge');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(gestureBadgeTimer);
+  gestureBadgeTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ── HAND TRACKING ──
+let handTrackingActive = false;
+let tfModel = null;
+let handVideo = null;
+let handLoopId = null;
+let prevPinchDist = null;
+let prevHandAngle = null;
+let prevHandSpread = null;
+let handGrabbing = false;
+let handTrackInterval = null;
+
+// Smoothing buffers
+const smoothBuf = { x: [], y: [], angle: [], spread: [] };
+const SMOOTH_N = 5;
+function smooth(buf, val) {
+  buf.push(val);
+  if (buf.length > SMOOTH_N) buf.shift();
+  return buf.reduce((a, b) => a + b, 0) / buf.length;
+}
+
+async function toggleTracking() {
+  trackingEnabled = !trackingEnabled;
+  const btn = document.getElementById('trackingBtn');
+  const dot = document.getElementById('trackingDot');
+  const label = document.getElementById('trackingLabel');
+  const webcamContainer = document.getElementById('webcam-container');
+  btn.classList.toggle('on', trackingEnabled);
+
+  if (trackingEnabled) {
+    dot.classList.add('active');
+    label.textContent = 'LOADING...';
+    webcamContainer.classList.add('visible');
+    await startHandTracking();
+  } else {
+    dot.classList.remove('active');
+    label.textContent = 'TRACKING OFF';
+    webcamContainer.classList.remove('visible');
+    stopHandTracking();
+    showGesture('TRACKING OFF');
+  }
+}
+
+async function startHandTracking() {
+  showGesture('STARTING CAMERA...');
+  const label = document.getElementById('trackingLabel');
+
+  try {
+    // Step 1: Camera initialization
+    handVideo = document.getElementById('webcam');
+    if (!handVideo.srcObject) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' }
+      });
+      handVideo.srcObject = stream;
+    }
+    if (handVideo.paused || handVideo.readyState < 2) {
+      await new Promise((res) => {
+        handVideo.onloadedmetadata = res;
+        setTimeout(res, 3000);
+      });
+      try { await handVideo.play(); } catch(e) {}
+    }
+
+    label.textContent = 'LOADING MODEL...';
+    showGesture('LOADING MODEL...');
+
+    // Step 2: Dynamically load MediaPipe via ES Modules to instantly bind proper global tasks namespaces
+    const visionModuleUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js";
+    const mpVision = await import(visionModuleUrl);
+    
+    const HandLandmarker = mpVision.HandLandmarker;
+    const FilesetResolver = mpVision.FilesetResolver;
+
+    if (!HandLandmarker || !FilesetResolver) {
+      throw new Error('HandLandmarker structural assets missing from target build context.');
+    }
+
+    // Step 3: Map assets
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+    );
+
+    label.textContent = 'INIT MODEL...';
+    showGesture('INITIALIZING...');
+
+    // Step 4: Fire up runtime engine
+    tfModel = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate: 'GPU'
+      },
+      runningMode: 'VIDEO',
+      numHands: 1,
+    });
+
+    handTrackingActive = true;
+    label.textContent = 'TRACKING ON';
+    showGesture('HAND TRACKING READY — SHOW YOUR HAND ✋');
+    handLoop();
+
+  } catch (err) {
+    console.error('[HandTracking]', err);
+    label.textContent = 'ERROR';
+    const msg = String(err.message || err);
+    if (msg.includes('getUserMedia') || msg.includes('Permission') || msg.includes('NotAllowed')) {
+      showGesture('CAMERA PERMISSION DENIED');
+    } else {
+      showGesture('ERR: ' + msg.slice(0, 30));
+    }
+    document.getElementById('trackingDot').classList.remove('active');
+    trackingEnabled = false;
+    document.getElementById('trackingBtn').classList.remove('on');
+    document.getElementById('webcam-container').classList.remove('visible');
+  }
+}
+
+function stopHandTracking() {
+  handTrackingActive = false;
+  cancelAnimationFrame(handLoopId);
+  clearInterval(handTrackInterval);
+  if (tfModel) { try { tfModel.close(); } catch(e) {} tfModel = null; }
+  if (handVideo && handVideo.srcObject) {
+    handVideo.srcObject.getTracks().forEach(t => t.stop());
+    handVideo.srcObject = null;
+  }
+  smoothBuf.x.length = 0; smoothBuf.y.length = 0;
+  smoothBuf.angle.length = 0; smoothBuf.spread.length = 0;
+  prevPinchDist = null; prevHandAngle = null; prevHandSpread = null;
+  handGrabbing = false;
+}
+
+function handLoop() {
+  if (!handTrackingActive || !tfModel) return;
+  try {
+    if (!handVideo || handVideo.readyState < 2 || handVideo.paused) {
+      handLoopId = requestAnimationFrame(handLoop);
+      return;
+    }
+    const nowMs = performance.now();
+    const result = tfModel.detectForVideo(handVideo, nowMs);
+    const hands = [];
+    if (result && result.landmarks && result.landmarks.length > 0) {
+      result.landmarks.forEach((lmList, hi) => {
+        const kp = lmList.map((p, i) => ({
+          x: p.x * 320,
+          y: p.y * 240,
+          name: i
+        }));
+        hands.push({ keypoints: kp });
+      });
+    }
+    processFrame(hands);
+  } catch(e) { console.warn('handLoop err', e); }
+  handLoopId = requestAnimationFrame(handLoop);
+}
+
+// Landmark indices for MediaPipeHands via tfjs:
+// 0=wrist,4=thumb_tip,8=index_tip,12=middle_tip,16=ring_tip,20=pinky_tip,9=middle_mcp
+const CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+  [13,17],[17,18],[18,19],[19,20],[0,17]];
+
+function processFrame(hands) {
+  const hCanvas = document.getElementById('hand-canvas');
+  const ctx = hCanvas.getContext('2d');
+  const W = hCanvas.width, H = hCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!hands || hands.length === 0) {
+    if (handGrabbing) { handGrabbing = false; showGesture('HAND LOST'); cursorEl.className = ''; }
+    prevPinchDist = null; prevHandAngle = null; prevHandSpread = null;
+    return;
+  }
+
+  const kp = hands[0].keypoints;
+
+  // Draw skeleton on preview
+  ctx.strokeStyle = 'rgba(109,250,189,0.85)';
+  ctx.lineWidth = 1.5;
+  CONNECTIONS.forEach(([a, b]) => {
+    if (!kp[a] || !kp[b]) return;
+    const ax = (kp[a].x / 320) * W, ay = (kp[a].y / 240) * H;
+    const bx = (kp[b].x / 320) * W, by = (kp[b].y / 240) * H;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  });
+  kp.forEach((p, i) => {
+    const x = (p.x / 320) * W, y = (p.y / 240) * H;
+    ctx.beginPath(); ctx.arc(x, y, i === 4 || i === 8 ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = (i === 4 || i === 8) ? 'rgba(250,109,143,1)' : 'rgba(124,109,250,0.9)';
+    ctx.fill();
+  });
+
+  // ── GESTURE LOGIC ──
+  const thumb = kp[4], index = kp[8], middle = kp[12], ring = kp[16], pinky = kp[20];
+  const wrist = kp[0], midMcp = kp[9];
+
+  // Normalize to 0-1 range
+  const nx = p => p.x / 320;
+  const ny = p => p.y / 240;
+
+  // Pinch: thumb tip ↔ index tip distance
+  const rawPinch = Math.hypot(nx(thumb) - nx(index), ny(thumb) - ny(index));
+  const isPinching = rawPinch < 0.09;
+
+  // Finger spread: pinky ↔ index
+  const rawSpread = Math.hypot(nx(pinky) - nx(index), ny(pinky) - ny(index));
+  const spread = smooth(smoothBuf.spread, rawSpread);
+
+  // Hand tilt angle (wrist → midMcp)
+  const rawAngle = Math.atan2(ny(midMcp) - ny(wrist), nx(midMcp) - nx(wrist));
+  const handAngle = smooth(smoothBuf.angle, rawAngle);
+
+  // Index fingertip → map to 3D world (mirrored: x flipped)
+  const sx = smooth(smoothBuf.x, nx(index));
+  const sy = smooth(smoothBuf.y, ny(index));
+  const normX = (sx - 0.5) * 2;   // -1..1
+  const normY = -(sy - 0.5) * 2;  // -1..1
+
+  // Project onto a ground-ish plane in world space
+  const ray = new THREE.Raycaster();
+  const ndcMouse = new THREE.Vector2(normX, normY);
+  ray.setFromCamera(ndcMouse, camera);
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const worldPt = new THREE.Vector3();
+  ray.ray.intersectPlane(groundPlane, worldPt);
+
+  // ── DRAW PINCH INDICATOR ──
+  ctx.strokeStyle = isPinching ? 'rgba(250,109,143,1)' : 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = isPinching ? 3 : 1;
+  ctx.beginPath();
+  ctx.moveTo((nx(thumb)) * W, (ny(thumb)) * H);
+  ctx.lineTo((nx(index)) * W, (ny(index)) * H);
+  ctx.stroke();
+  // Pinch circle feedback
+  if (isPinching) {
+    const mx = ((nx(thumb) + nx(index)) / 2) * W;
+    const my = ((ny(thumb) + ny(index)) / 2) * H;
+    ctx.beginPath(); ctx.arc(mx, my, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(250,109,143,0.5)'; ctx.fill();
+  }
+
+  // ── PINCH → GRAB & MOVE ──
+  if (isPinching) {
+    if (!handGrabbing) {
+      if (!selectedObject) {
+        let best = null, bestD = Infinity;
+        objects.forEach(obj => {
+          const d = obj.position.distanceTo(worldPt.clone().setY(obj.position.y));
+          if (d < bestD) { bestD = d; best = obj; }
+        });
+        if (best && bestD < 4) selectObject(best);
+      }
+      handGrabbing = true;
+      cursorEl.className = 'pinch';
+      showGesture('✊ PINCH GRAB');
+    }
+    if (selectedObject && worldPt.x !== undefined) {
+      const lerp = 0.18;
+      selectedObject.position.x += (worldPt.x - selectedObject.position.x) * lerp;
+      selectedObject.position.z += (worldPt.z - selectedObject.position.z) * lerp;
+      selectedObject.position.y = Math.max(0.4, selectedObject.position.y);
+      updateProperties(selectedObject);
+    }
+  } else {
+    if (handGrabbing) {
+      handGrabbing = false;
+      cursorEl.className = hoveredObject ? 'hover' : '';
+      showGesture('RELEASED');
+    }
+  }
+
+  // ── HAND TILT → ROTATE ──
+  if (prevHandAngle !== null && selectedObject && !isPinching) {
+    const dAngle = handAngle - prevHandAngle;
+    if (Math.abs(dAngle) > 0.008 && Math.abs(dAngle) < 0.25) {
+      selectedObject.rotation.y += dAngle * 2.5;
+      if (Math.abs(dAngle) > 0.015) showGesture('🔄 ROTATING');
+      updateProperties(selectedObject);
+    }
+  }
+
+  // ── SPREAD → SCALE ──
+  if (prevHandSpread !== null && selectedObject && !isPinching) {
+    const dSpread = spread - prevHandSpread;
+    if (Math.abs(dSpread) > 0.008) {
+      const sf = 1 + dSpread * 4;
+      selectedObject.scale.multiplyScalar(sf);
+      selectedObject.scale.clampScalar(0.15, 6);
+      if (Math.abs(dSpread) > 0.012) showGesture('↔ SCALING');
+      updateProperties(selectedObject);
+    }
+  }
+
+  prevPinchDist = rawPinch;
+  prevHandAngle = handAngle;
+  prevHandSpread = spread;
+}
+
+// ── ANIMATE ──
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  objects.forEach(obj => {
+    if (obj !== selectedObject && !isDragging) {
+      obj.rotation.y += 0.003;
+    }
+    if (obj !== selectedObject) {
+      obj.position.y = 0.6 + Math.sin(t * 0.8 + obj.userData.id) * 0.04;
+    }
+  });
+
+  fillLight.intensity = 2 + Math.sin(t * 0.7) * 0.5;
+  rimLight.intensity = 1.5 + Math.cos(t * 0.5) * 0.4;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── RESIZE ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── LOADING ──
+window.addEventListener('load', () => {
+  const fill = document.getElementById('loadingFill');
+  const screen = document.getElementById('loadingScreen');
+  setTimeout(() => { fill.style.width = '100%'; }, 100);
+  setTimeout(() => { screen.classList.add('hide'); }, 1800);
+  setTimeout(() => { screen.style.display = 'none'; }, 2400);
+
+  setTimeout(() => addObject('cube'), 2200);
+  setTimeout(() => addObject('sphere'), 2400);
+});
+</script>
+</body>
+</html>
